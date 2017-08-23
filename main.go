@@ -11,6 +11,10 @@ func main() {
 	}
 	defer glfw.Terminate()
 
+	glfw.WindowHint(glfw.ContextVersionMajor, 3)
+	glfw.WindowHint(glfw.ContextVersionMinor, 3)
+	glfw.WindowHint(glfw.OpenGLProfile, glfw.OpenGLCoreProfile)
+
 	window, err := glfw.CreateWindow(640, 480, "testing", nil, nil)
 	if err != nil {
 		panic(err)
@@ -19,14 +23,13 @@ func main() {
 	window.MakeContextCurrent()
 
 	window.SetKeyCallback(keyCallback)
+	window.SetFramebufferSizeCallback(frameBufferCallback)
 
 	if err := gl.Init(); err != nil {
 		panic(err)
 	}
 
 	for !window.ShouldClose() {
-		w, h := window.GetFramebufferSize()
-		gl.Viewport(0, 0, int32(w), int32(h))
 
 		gl.ClearColor(0.0, 1.0, 0.0, 1.0)
 		gl.Clear(gl.COLOR_BUFFER_BIT)
@@ -41,4 +44,8 @@ func keyCallback(w *glfw.Window, key glfw.Key, scancode int, action glfw.Action,
 	if key == glfw.KeyEscape && action == glfw.Press {
 		w.SetShouldClose(true)
 	}
+}
+
+func frameBufferCallback(w *glfw.Window, width int, height int) {
+	gl.Viewport(0, 0, int32(width), int32(height))
 }
