@@ -5,6 +5,35 @@ import (
 	"github.com/go-gl/glfw/v3.2/glfw"
 )
 
+const (
+	width  = 640
+	height = 480
+	title  = "Learning OpenGL!"
+)
+
+var (
+	verticies = []float32{
+		-0.5, -0.5, 0.0,
+		0.5, -0.5, 0.0,
+		0.0, 0.5, 0.0,
+	}
+
+	vertexShaderSource = `
+	#version 330 core
+	layout (location = 0) in vec3 aPos;
+	
+	void main()
+	{
+		gl_Position = vec4(aPos.x, aPos.y, aPos.z, 1.0);
+	}`
+)
+
+// float vertices[] = {
+//     -0.5f, -0.5f, 0.0f,
+//      0.5f, -0.5f, 0.0f,
+//      0.0f,  0.5f, 0.0f
+// };
+
 func main() {
 	if err := glfw.Init(); err != nil {
 		panic(err)
@@ -15,7 +44,7 @@ func main() {
 	glfw.WindowHint(glfw.ContextVersionMinor, 3)
 	glfw.WindowHint(glfw.OpenGLProfile, glfw.OpenGLCoreProfile)
 
-	window, err := glfw.CreateWindow(640, 480, "testing", nil, nil)
+	window, err := glfw.CreateWindow(width, height, title, nil, nil)
 	if err != nil {
 		panic(err)
 	}
@@ -28,6 +57,17 @@ func main() {
 	if err := gl.Init(); err != nil {
 		panic(err)
 	}
+
+	var vbo uint32
+	gl.GenBuffers(1, &vbo)
+	gl.BindBuffer(gl.ARRAY_BUFFER, vbo)
+	gl.BufferData(vbo, len(verticies)*4, gl.Ptr(verticies), gl.STATIC_DRAW)
+
+	vertexShader := gl.CreateShader(gl.VERTEX_SHADER)
+	cstr, free := gl.Strs(vertexShaderSource)
+	free()
+	gl.ShaderSource(vertexShader, 1, cstr, nil)
+	gl.CompileShader(vertexShader)
 
 	for !window.ShouldClose() {
 
