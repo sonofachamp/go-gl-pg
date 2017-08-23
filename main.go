@@ -63,15 +63,15 @@ func main() {
 
 	vertexShader := gl.CreateShader(gl.VERTEX_SHADER)
 	cstr, free := gl.Strs(vertexShaderSource)
-	free()
 	gl.ShaderSource(vertexShader, 1, cstr, nil)
+	free()
 	gl.CompileShader(vertexShader)
 	// TODO: add err checking after shader compiling
 
 	fragmentShader := gl.CreateShader(gl.FRAGMENT_SHADER)
 	cstr, free = gl.Strs(fragmentShaderSource)
-	free()
 	gl.ShaderSource(fragmentShader, 1, cstr, nil)
+	free()
 	gl.CompileShader(fragmentShader)
 
 	program := gl.CreateProgram()
