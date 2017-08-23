@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/go-gl/gl/v2.1/gl"
+	"github.com/go-gl/gl/v3.3-core/gl"
 	"github.com/go-gl/glfw/v3.2/glfw"
 )
 
