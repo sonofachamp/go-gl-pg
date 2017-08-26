@@ -1,6 +1,11 @@
 package main
 
 import (
+	"fmt"
+	"log"
+	"runtime"
+	"strings"
+
 	"github.com/go-gl/gl/v3.3-core/gl"
 	"github.com/go-gl/glfw/v3.2/glfw"
 )
@@ -25,7 +30,7 @@ var (
 	void main()
 	{
 		gl_Position = vec4(aPos.x, aPos.y, aPos.z, 1.0);
-	}`
+	}` + "\x00"
 
 	fragmentShaderSource = `
 	#version 330 core
@@ -34,12 +39,17 @@ var (
 	void main()
 	{
 		FragColor = vec4(1.0f, 0.5f, 0.2f, 1.0f);
-	} `
+	}` + "\x00"
 )
+
+func init() {
+	//GLFW event handling must run on main OS thread
+	runtime.LockOSThread()
+}
 
 func main() {
 	if err := glfw.Init(); err != nil {
-		panic(err)
+		log.Fatalln("error initializing glfw: ", err)
 	}
 	defer glfw.Terminate()
 
@@ -49,7 +59,7 @@ func main() {
 
 	window, err := glfw.CreateWindow(width, height, title, nil, nil)
 	if err != nil {
-		panic(err)
+		log.Fatalln("error creating window: ", err)
 	}
 
 	window.MakeContextCurrent()
@@ -58,32 +68,18 @@ func main() {
 	window.SetFramebufferSizeCallback(frameBufferCallback)
 
 	if err := gl.Init(); err != nil {
-		panic(err)
+		log.Fatalln("error initializing opengl: ", err)
 	}
 
-	vertexShader := gl.CreateShader(gl.VERTEX_SHADER)
-	cstr, free := gl.Strs(vertexShaderSource)
-	gl.ShaderSource(vertexShader, 1, cstr, nil)
-	free()
-	gl.CompileShader(vertexShader)
-	// TODO: add err checking after shader compiling
+	version := gl.GoStr(gl.GetString(gl.VERSION))
+	fmt.Println("OpenGL version: ", version)
 
-	fragmentShader := gl.CreateShader(gl.FRAGMENT_SHADER)
-	cstr, free = gl.Strs(fragmentShaderSource)
-	gl.ShaderSource(fragmentShader, 1, cstr, nil)
-	free()
-	gl.CompileShader(fragmentShader)
-
-	program := gl.CreateProgram()
-	gl.AttachShader(program, vertexShader)
-	gl.AttachShader(program, fragmentShader)
-	gl.LinkProgram(program)
-	// TODO: check for shader link errors
+	program, err := newProgram(vertexShaderSource, fragmentShaderSource)
+	if err != nil {
+		log.Fatalln("error creating program: ", err)
+	}
 
 	gl.UseProgram(program)
-
-	gl.DeleteShader(vertexShader)
-	gl.DeleteShader(fragmentShader)
 
 	var vao uint32
 	gl.GenVertexArrays(1, &vao)
@@ -100,9 +96,10 @@ func main() {
 	gl.BindBuffer(gl.ARRAY_BUFFER, 0)
 	gl.BindVertexArray(0)
 
+	gl.ClearColor(0.0, 1.0, 0.0, 1.0)
+
 	for !window.ShouldClose() {
 
-		gl.ClearColor(0.0, 1.0, 0.0, 1.0)
 		gl.Clear(gl.COLOR_BUFFER_BIT)
 
 		gl.UseProgram(program)
@@ -126,4 +123,63 @@ func keyCallback(w *glfw.Window, key glfw.Key, scancode int, action glfw.Action,
 
 func frameBufferCallback(w *glfw.Window, width int, height int) {
 	gl.Viewport(0, 0, int32(width), int32(height))
+}
+
+func newProgram(vertexShaderSource, fragmentShaderSource string) (uint32, error) {
+	vertexShader, err := compileShader(vertexShaderSource, gl.VERTEX_SHADER)
+	if err != nil {
+		return 0, err
+	}
+
+	fragmentShader, err := compileShader(fragmentShaderSource, gl.FRAGMENT_SHADER)
+	if err != nil {
+		return 0, err
+	}
+
+	program := gl.CreateProgram()
+
+	gl.AttachShader(program, vertexShader)
+	gl.AttachShader(program, fragmentShader)
+
+	gl.LinkProgram(program)
+
+	var status int32
+	gl.GetProgramiv(program, gl.LINK_STATUS, &status)
+	if status == gl.FALSE {
+		var logLength int32
+		gl.GetProgramiv(program, gl.INFO_LOG_LENGTH, &logLength)
+
+		log := strings.Repeat("\x00", int(logLength+1))
+		gl.GetProgramInfoLog(program, logLength, nil, gl.Str(log))
+
+		return 0, fmt.Errorf("failed to link program: %v", log)
+	}
+
+	gl.DeleteShader(vertexShader)
+	gl.DeleteShader(fragmentShader)
+
+	return program, nil
+}
+
+func compileShader(source string, shaderType uint32) (uint32, error) {
+	shader := gl.CreateShader(shaderType)
+
+	csources, free := gl.Strs(source)
+	gl.ShaderSource(shader, 1, csources, nil)
+	free()
+	gl.CompileShader(shader)
+
+	var status int32
+	gl.GetShaderiv(shader, gl.COMPILE_STATUS, &status)
+	if status == gl.FALSE {
+		var logLength int32
+		gl.GetShaderiv(shader, gl.INFO_LOG_LENGTH, &logLength)
+
+		log := strings.Repeat("\x00", int(logLength+1))
+		gl.GetShaderInfoLog(shader, logLength, nil, gl.Str(log))
+
+		return 0, fmt.Errorf("failed to compile %v: %v", source, log)
+	}
+
+	return shader, nil
 }
